@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+.env
+
+# Data / cache / checkpoints
+data/
+*.db
+*.sqlite3
+
+# OS / IDE files
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# AWS credentials or config
+*.pem
+*.key

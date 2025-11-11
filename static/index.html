@@ -1,0 +1,1054 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Multi-LLM Chat</title>
+  <style>
+    :root{
+      --bg:#f5f7fa; --card:#ffffff; --muted:#64748b; --accent:#7c3aed;
+      --user:#0ea5a4; --assistant:#f97316; --border:#e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    html,body{height:100%;margin:0;font-family:'Inter',system-ui,-apple-system,sans-serif;}
+    body{background:var(--bg);color:#1e293b;overflow:hidden;}
+    
+    /* Model Selection Screen */
+    .model-selection-screen {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      margin-bottom: 32px;
+    }
+    
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+      color: #0f172a;
+    }
+    
+    .header p {
+      color: var(--muted);
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 24px;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 24px;
+    }
+    
+    .tab {
+      padding: 12px 0;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+      overflow-y: auto;
+      padding: 4px;
+    }
+    
+    .model-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 0;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 2px solid transparent;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    
+    .model-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+      border-color: var(--accent);
+    }
+    
+    .model-card-image {
+      width: 100%;
+      height: 140px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .model-card-image::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      animation: shimmer 3s infinite;
+    }
+    
+    @keyframes shimmer {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(10%, 10%); }
+    }
+    
+    .model-card:nth-child(1) .model-card-image { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .model-card:nth-child(2) .model-card-image { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .model-card:nth-child(3) .model-card-image { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .model-card:nth-child(4) .model-card-image { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .model-card:nth-child(5) .model-card-image { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .model-card:nth-child(6) .model-card-image { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
+    
+    .model-card-content {
+      padding: 16px;
+    }
+    
+    .model-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+      color: #0f172a;
+    }
+    
+    .model-card-desc {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .model-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px 16px;
+    }
+    
+    .model-card-key {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    
+    .model-card-icon {
+      color: var(--muted);
+      font-size: 20px;
+    }
+    
+    /* Chat Screen */
+    .chat-screen {
+      display: none;
+      height: 100vh;
+      background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+      position: relative;
+    }
+    
+    .chat-container {
+      max-width: 900px;
+      margin: 0 auto;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 40px 20px 20px;
+    }
+    
+    .chat-header {
+      text-align: center;
+      margin-bottom: 24px;
+      animation: fadeInDown 0.5s;
+    }
+    
+    .chat-header h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .chat-header p {
+      color: #475569;
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+    
+    .back-btn:hover {
+      transform: translateX(-4px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .chat-box {
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      padding: 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeInUp 0.5s;
+    }
+    
+    .messages-area {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      padding-right: 8px;
+    }
+    
+    .messages-area::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .messages-area::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .messages-area::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    
+    .message {
+      margin: 12px 0;
+      padding: 14px 18px;
+      border-radius: 16px;
+      max-width: 75%;
+      animation: slideIn 0.3s;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .message.user {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .message.assistant {
+      background: #f1f5f9;
+      color: #1e293b;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .input-area {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 20px;
+      padding: 6px;
+      display: flex;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    }
+    
+    .input-wrapper {
+      flex: 1;
+      background: white;
+      border-radius: 16px;
+      padding: 4px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .voice-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      transition: transform 0.2s;
+    }
+    
+    .voice-btn:hover {
+      transform: scale(1.1);
+    }
+    
+    .chat-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      padding: 12px 0;
+      font-family: inherit;
+      color: #1e293b;
+    }
+    
+    .chat-input::placeholder {
+      color: #94a3b8;
+    }
+    
+    .send-btn {
+      background: white;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 20px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .send-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .suggestions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    
+    .suggestion-chip {
+      background: white;
+      border: 2px solid #e2e8f0;
+      padding: 10px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .suggestion-chip:hover {
+      border-color: var(--accent);
+      background: #f8f4ff;
+      transform: translateY(-2px);
+    }
+    
+    .suggestion-icon {
+      font-size: 16px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+    
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* RAG Panel in Chat */
+    .rag-chat-panel {
+      position: fixed;
+      right: 20px;
+      top: 80px;
+      bottom: 20px;
+      width: 340px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .rag-chat-panel.visible {
+      display: block;
+    }
+    
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .rag-chat-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .rag-chat-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .rag-chat-panel::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    
+    .rag-header {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .rag-file-input {
+      width: 100%;
+      padding: 10px;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .rag-file-input:hover {
+      border-color: var(--accent);
+      background: #f8f4ff;
+    }
+    
+    .uploaded-docs {
+      margin: 12px 0;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    
+    .doc-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background: var(--bg);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      animation: fadeIn 0.3s;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .doc-item-name {
+      flex: 1;
+      color: #1e293b;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .doc-item-icon {
+      margin-right: 8px;
+      font-size: 16px;
+    }
+    
+    .doc-item-size {
+      color: var(--muted);
+      font-size: 11px;
+      margin-left: 8px;
+    }
+    
+    .rag-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    }
+    
+    .rag-btn:hover {
+      background: #6d28d9;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+    }
+    
+    .rag-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .rag-btn.danger {
+      background: #ef4444;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+    
+    .rag-btn.danger:hover {
+      background: #dc2626;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+    
+    .rag-query-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    
+    .rag-query-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    }
+    
+    .rag-results {
+      margin-top: 16px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+    
+    .rag-result-item {
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      line-height: 1.5;
+      border-left: 3px solid var(--accent);
+      animation: fadeIn 0.3s;
+    }
+    
+    .rag-score {
+      font-weight: 700;
+      color: var(--accent);
+      margin-right: 8px;
+    }
+    
+    .docs-toggle-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: white;
+      border: none;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      font-size: 20px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      z-index: 999;
+    }
+    
+    .docs-toggle-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+    }
+    
+    .docs-toggle-btn.visible {
+      display: flex;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Model Selection Screen -->
+  <div id="modelSelectionScreen" class="model-selection-screen">
+    <div class="header">
+      <h1>Multi-LLM Chat</h1>
+      <p>Choose a model to start your conversation or upload documents for RAG-powered chat</p>
+    </div>
+    
+    <div class="tabs">
+      <div class="tab active">Recommended</div>
+      <div class="tab">My tools</div>
+      <div class="tab">Recently added</div>
+      <div class="tab">Popular tools</div>
+    </div>
+    
+    <div id="modelsGrid" class="models-grid">
+      <!-- Models will be populated here -->
+    </div>
+  </div>
+
+  <!-- Chat Screen -->
+  <div id="chatScreen" class="chat-screen">
+    <button class="back-btn" id="backBtn">
+      ← Back
+    </button>
+    
+    <button class="docs-toggle-btn" id="docsToggleBtn">📄</button>
+    
+    <div class="chat-container">
+      <div class="chat-header">
+        <h2 id="chatTitle">Search using AI</h2>
+        <p id="chatSubtitle">A Smart and intelligent search for your needs</p>
+      </div>
+      
+      <div class="chat-box">
+        <div id="messagesArea" class="messages-area">
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <p>Start your conversation...</p>
+          </div>
+        </div>
+        
+        <div id="suggestions" class="suggestions">
+          <div class="suggestion-chip" data-text="What are the most popular Gen-AI tools?">
+            <span class="suggestion-icon">🤖</span>
+            What are the most popular Gen-AI tools?
+          </div>
+          <div class="suggestion-chip" data-text="Are there any free courses on Generative AI?">
+            <span class="suggestion-icon">📚</span>
+            Are there any free courses on AI?
+          </div>
+        </div>
+        
+        <div class="input-area">
+          <div class="input-wrapper">
+            <button class="voice-btn" title="Voice input">🎤</button>
+            <input type="text" id="chatInput" class="chat-input" placeholder="Search AI tools..." />
+          </div>
+          <button class="send-btn" id="sendBtn">→</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- RAG Panel in Chat Screen -->
+    <div class="rag-chat-panel" id="ragChatPanel">
+      <div class="rag-header">📄 Documents (RAG)</div>
+      
+      <form id="uploadForm">
+        <input type="file" id="docFile" accept=".txt,.pdf,.docx" class="rag-file-input" />
+        <button type="submit" class="rag-btn">Upload Document</button>
+      </form>
+      
+      <div id="uploadedDocs" class="uploaded-docs"></div>
+      
+      <input id="ragQuery" type="text" placeholder="Query documents..." class="rag-query-input" />
+      <button id="ragQueryBtn" class="rag-btn">Search Documents</button>
+      
+      <div id="ragResults" class="rag-results"></div>
+      
+      <button id="clearDocsBtn" class="rag-btn danger">🗑 Clear All Documents</button>
+    </div>
+  </div>
+
+<script>
+const apiBase = '';
+let currentChatId = null;
+let currentModelKey = null;
+let currentModelName = null;
+let uploadedDocuments = [];
+
+// UI Elements
+const modelSelectionScreen = document.getElementById('modelSelectionScreen');
+const chatScreen = document.getElementById('chatScreen');
+const modelsGrid = document.getElementById('modelsGrid');
+const backBtn = document.getElementById('backBtn');
+const chatTitle = document.getElementById('chatTitle');
+const chatSubtitle = document.getElementById('chatSubtitle');
+const messagesArea = document.getElementById('messagesArea');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const suggestions = document.getElementById('suggestions');
+const docsToggleBtn = document.getElementById('docsToggleBtn');
+const ragChatPanel = document.getElementById('ragChatPanel');
+const uploadForm = document.getElementById('uploadForm');
+const docFile = document.getElementById('docFile');
+const uploadedDocs = document.getElementById('uploadedDocs');
+const ragQuery = document.getElementById('ragQuery');
+const ragQueryBtn = document.getElementById('ragQueryBtn');
+const ragResults = document.getElementById('ragResults');
+const clearDocsBtn = document.getElementById('clearDocsBtn');
+
+// Message helpers
+function appendMsg(role, text) {
+  const emptyState = messagesArea.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+  
+  if (suggestions.style.display !== 'none') {
+    suggestions.style.display = 'none';
+  }
+  
+  const el = document.createElement('div');
+  el.className = 'message ' + role;
+  el.textContent = text;
+  messagesArea.appendChild(el);
+  messagesArea.scrollTop = messagesArea.scrollHeight;
+}
+
+// Update uploaded documents display
+function updateUploadedDocs() {
+  if (uploadedDocuments.length === 0) {
+    uploadedDocs.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">No documents uploaded yet</div>';
+  } else {
+    uploadedDocs.innerHTML = uploadedDocuments.map((doc, idx) => `
+      <div class="doc-item">
+        <span class="doc-item-icon">📄</span>
+        <span class="doc-item-name" title="${doc.name}">${doc.name}</span>
+        <span class="doc-item-size">${formatFileSize(doc.size)}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// Format file size
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Fetch and display available models
+async function fetchModels() {
+  try {
+    const res = await fetch(apiBase + '/api/models/list');
+    if (!res.ok) throw new Error('fetch failed');
+    const data = await res.json();
+    
+    modelsGrid.innerHTML = '';
+    
+    data.forEach((model, idx) => {
+      const card = document.createElement('div');
+      card.className = 'model-card';
+      card.innerHTML = `
+        <div class="model-card-image"></div>
+        <div class="model-card-content">
+          <h3 class="model-card-title">${model.name || model.key}</h3>
+          <p class="model-card-desc">${model.description || 'AI-powered language model for intelligent conversations'}</p>
+        </div>
+        <div class="model-card-footer">
+          <span class="model-card-key">${model.key}</span>
+          <span class="model-card-icon">→</span>
+        </div>
+      `;
+      
+      card.addEventListener('click', () => startChat(model.key, model.name || model.key));
+      modelsGrid.appendChild(card);
+    });
+    
+    if (data.length === 0) {
+      modelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--muted); padding: 40px;">No models available. Please check backend connection.</div>';
+    }
+  } catch (err) {
+    modelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 40px;">Could not load models. Is the backend running at http://localhost:5000?</div>';
+  }
+}
+
+// Start new chat
+async function startChat(modelKey, modelName) {
+  currentModelKey = modelKey;
+  currentModelName = modelName;
+  
+  try {
+    const res = await fetch(apiBase + '/api/chat/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model_key: modelKey, title: modelName + ' chat'})
+    });
+    
+    if (!res.ok) throw new Error('Could not start chat');
+    const data = await res.json();
+    currentChatId = data.chat_id;
+    
+    // Switch to chat screen
+    modelSelectionScreen.style.display = 'none';
+    chatScreen.style.display = 'block';
+    docsToggleBtn.classList.add('visible');
+    chatTitle.textContent = `Chat with ${modelName}`;
+    chatSubtitle.textContent = `Powered by ${modelKey}`;
+    messagesArea.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <p>Start your conversation...</p>
+      </div>
+    `;
+    suggestions.style.display = 'flex';
+    updateUploadedDocs();
+    chatInput.focus();
+  } catch (err) {
+    alert('Failed to start chat: ' + err.message);
+  }
+}
+
+// Send message
+async function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  if (!currentChatId) {
+    alert('Please start a chat first.');
+    return;
+  }
+  
+  appendMsg('user', text);
+  chatInput.value = '';
+  sendBtn.disabled = true;
+  
+  try {
+    const res = await fetch(apiBase + '/api/chat/' + currentChatId + '/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text})
+    });
+    
+    sendBtn.disabled = false;
+    
+    if (!res.ok) {
+      appendMsg('assistant', '[Error] ' + await res.text());
+      return;
+    }
+    
+    const data = await res.json();
+    appendMsg('assistant', data.assistant || '[No response]');
+  } catch (err) {
+    appendMsg('assistant', '[Network error] ' + err.message);
+    sendBtn.disabled = false;
+  }
+}
+
+// Back button
+backBtn.addEventListener('click', () => {
+  chatScreen.style.display = 'none';
+  modelSelectionScreen.style.display = 'flex';
+  docsToggleBtn.classList.remove('visible');
+  ragChatPanel.classList.remove('visible');
+  currentChatId = null;
+  currentModelKey = null;
+  currentModelName = null;
+});
+
+// Send button
+sendBtn.addEventListener('click', sendMessage);
+
+// Enter key to send
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Suggestion chips
+suggestions.addEventListener('click', (e) => {
+  const chip = e.target.closest('.suggestion-chip');
+  if (chip) {
+    chatInput.value = chip.dataset.text;
+    sendMessage();
+  }
+});
+
+// Documents Toggle
+docsToggleBtn.addEventListener('click', () => {
+  ragChatPanel.classList.toggle('visible');
+});
+
+// RAG Upload
+uploadForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = docFile.files[0];
+  if (!file) {
+    alert('Choose a file first');
+    return;
+  }
+  
+  const fd = new FormData();
+  fd.append('file', file);
+  
+  try {
+    const uploadBtn = uploadForm.querySelector('button[type="submit"]');
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+    
+    const res = await fetch(apiBase + '/api/rag/upload', {method: 'POST', body: fd});
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    
+    // Add to uploaded documents list
+    uploadedDocuments.push({
+      name: file.name,
+      size: file.size,
+      chunks: data.count || 0
+    });
+    
+    updateUploadedDocs();
+    alert(`✅ Uploaded and indexed ${data.count || '?'} chunks from "${file.name}"`);
+    docFile.value = '';
+    
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload Document';
+  } catch (err) {
+    alert('Upload failed: ' + err.message);
+    const uploadBtn = uploadForm.querySelector('button[type="submit"]');
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = 'Upload Document';
+  }
+});
+
+// RAG Query
+ragQueryBtn.addEventListener('click', async () => {
+  const q = ragQuery.value.trim();
+  if (!q) return;
+  
+  if (uploadedDocuments.length === 0) {
+    ragResults.innerHTML = '<div style="color:#f97316;padding:10px;text-align:center;">Please upload documents first</div>';
+    return;
+  }
+  
+  try {
+    ragQueryBtn.disabled = true;
+    ragQueryBtn.textContent = 'Searching...';
+    
+    const res = await fetch(apiBase + '/api/rag/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query: q, top_k: 5})
+    });
+    
+    ragQueryBtn.disabled = false;
+    ragQueryBtn.textContent = 'Search Documents';
+    
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    
+    if (data.length === 0) {
+      ragResults.innerHTML = '<div style="color:var(--muted);padding:10px;text-align:center;">No results found</div>';
+    } else {
+      ragResults.innerHTML = data.map(d =>
+        `<div class="rag-result-item"><span class="rag-score">${d.score.toFixed(2)}</span>${d.text}</div>`
+      ).join('');
+    }
+  } catch (err) {
+    ragResults.innerHTML = '<div style="color:#ef4444;padding:10px;">Error: ' + err.message + '</div>';
+    ragQueryBtn.disabled = false;
+    ragQueryBtn.textContent = 'Search Documents';
+  }
+});
+
+// Clear documents
+clearDocsBtn.addEventListener('click', async () => {
+  if (!confirm('Are you sure you want to remove all uploaded documents?')) return;
+  
+  try {
+    const res = await fetch(apiBase + '/api/rag/clear', {method: 'POST'});
+    const data = await res.json();
+    uploadedDocuments = [];
+    updateUploadedDocs();
+    ragResults.innerHTML = '';
+    alert(data.message || 'Documents cleared');
+  } catch (err) {
+    alert('Error clearing docs: ' + err.message);
+  }
+});
+
+// Initialize
+fetchModels();
+updateUploadedDocs();
+</script>
+</body>
+</html>
